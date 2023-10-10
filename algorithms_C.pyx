@@ -413,7 +413,7 @@ class Pixeliser(object):
             #     print(check)
             
             # recenter
-            for i in range(N*((len_p%8)//7)):
+            for i in range(N*((len_p%4)//3)):
                 tmp_loc = sprpxls[i]
                 tmp_loc.recenter(dt_arr, mask, i)
                 view_cntsx[i] = tmp_loc.get_centerx()
@@ -456,7 +456,7 @@ class Pixeliser(object):
                     count += 1
                 view_cntsx2[i2] = 0.6 * view_cntsx[i2] + 0.4 * (sum_x/count)
                 view_cntsy2[i2] = 0.6 * view_cntsy[i2] + 0.4 * (sum_y/count)
-                printf("%f %f %f %f\n", view_cntsx2[i2], view_cntsx[i2], view_cntsy2[i2], view_cntsy[i2])
+                # printf("%f %f %f %f\n", view_cntsx2[i2], view_cntsx[i2], view_cntsy2[i2], view_cntsy[i2])
                 sum_x = 0
                 sum_y = 0
                 count = 0
