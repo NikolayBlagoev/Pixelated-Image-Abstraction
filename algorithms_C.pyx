@@ -24,21 +24,21 @@ cnp.import_array()
 #     I = arr.shape[0]
 #     J = arr.shape[1]
     
-#     for i in prange(I, nogil = True):
+#     for i in prange(I, nogil = True):dif3dq
         
             
 #         totalA += arr[i, 0]
 #     return totalA
 def sum3d(double[:,:] arr, int[:] indxs, int count):
-    cdef size_t i, j, I, J
+    cdef size_t i
     cdef float totalL = 0, totalA = 0, totalB = 0
     
     
     
     for i in prange(count, nogil = True):
-        totalL += arr[indxs[i], 0]
-        totalA += arr[indxs[i], 1]
-        totalB += arr[indxs[i], 2]
+        totalL += arr[indxs[i]][ 0]
+        totalA += arr[indxs[i]][ 1]
+        totalB += arr[indxs[i]][ 2]
         
     return totalL/count, totalA/count, totalB/count
 class Colour_Tree(object):
@@ -48,18 +48,6 @@ class Colour_Tree(object):
         self.lchld = None
         self.rchld = None
         pass
-@cython.nogil
-@cython.cfunc
-cpdef float dif3d(double[:,:] pxls, float[:] sprpxs, int pxl, int sprpxl, float m) nogil:
-    res: cython.float = 0
-    tmp_dist_x: cython.float = 0 
-    tmp_dist_x = pxls[pxl][0] - sprpxs[sprpxl*3]
-    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
-    tmp_dist_x = pxls[pxl][1] - sprpxs[sprpxl*3 + 1]
-    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
-    tmp_dist_x = pxls[pxl][2] - sprpxs[sprpxl*3 + 2]
-    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
-    return res
 cdef class SuperPixel:
     cdef array.array pixelsarr
     cdef int[:] pixels_view
@@ -158,9 +146,7 @@ class Pixeliser(object):
         
         Pixeliser.msg_queue.put(Image.fromarray((lab2rgb(ret)*255).astype(np.uint8)))
         
-    def dist(y_p, x_p, y_s, x_s):
-        
-        return math.sqrt((y_p - y_s)** 2)  + math.sqrt((x_p - x_s)** 2) 
+    
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def paper():
@@ -276,82 +262,90 @@ class Pixeliser(object):
                 tmp_dist_x: cython.float = 0.0
                 tmp_dist_y: cython.float = 0.0
                 res: cython.float = 0.0
+                acc_loc: cython.float = 0.0 
                 if sy_c > 0:
                     tmp_dist_x = view_cntsx[s_c - loc_sz] - x_c
                     tmp_dist_y = view_cntsy[s_c - loc_sz] - y_c
-                    res =  sqrt(tmp_dist_x*tmp_dist_x) + sqrt(tmp_dist_y*tmp_dist_y)
+                    res =  m *  sqrt(tmp_dist_x*tmp_dist_x + tmp_dist_y*tmp_dist_y)
                     tmp_dist_x = pxls_view[i2][0] - view_colours[s_c*3 - loc_sz*3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc = tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][1] - view_colours[s_c*3 + 1 - loc_sz*3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][2] - view_colours[s_c*3 + 2 - loc_sz*3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
+                    res += sqrt(acc_loc)
                     # res += dif3d(dt_arr, view_colours, i2, s_c, m)
                     if res < min_c:
                         min_c = res
                         min_indx = s_c - loc_sz
+                
                 if sx_c > 0:
                     tmp_dist_x = view_cntsx[s_c - 1] - x_c
                     tmp_dist_y = view_cntsy[s_c - 1] - y_c
-                    res =  sqrt(tmp_dist_x*tmp_dist_x) +  sqrt(tmp_dist_y*tmp_dist_y)
+                    res =  m *  sqrt(tmp_dist_x*tmp_dist_x + tmp_dist_y*tmp_dist_y)
                     tmp_dist_x = pxls_view[i2][0] - view_colours[s_c*3 - 3]
-                    res = res + m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc = tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][1] - view_colours[s_c*3 - 2]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][2] - view_colours[s_c*3 - 1]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
+                    res += sqrt(acc_loc)
                     if res < min_c:
                         min_c = res
                         min_indx = s_c - 1
                 if sx_c > 0 and sy_c > 0:
                     tmp_dist_x = view_cntsx[s_c - loc_sz - 1] - x_c
                     tmp_dist_y = view_cntsy[s_c - loc_sz - 1] - y_c
-                    res =  sqrt(tmp_dist_x*tmp_dist_x) + sqrt(tmp_dist_y*tmp_dist_y)
+                    res =  m *  sqrt(tmp_dist_x*tmp_dist_x + tmp_dist_y*tmp_dist_y)
                     tmp_dist_x = pxls_view[i2][0] - view_colours[s_c*3 - loc_sz*3 - 3]
-                    res = res + m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc = tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][1] - view_colours[s_c*3 + 1 - loc_sz*3 - 3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][2] - view_colours[s_c*3 + 2 - loc_sz*3 - 3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
+                    res += sqrt(acc_loc)
                     if res < min_c:
                         min_c = res
                         min_indx = s_c - loc_sz - 1
                 if True:
                     tmp_dist_x = view_cntsx[s_c] - x_c
                     tmp_dist_y = view_cntsy[s_c] - y_c
-                    res =  sqrt(tmp_dist_x*tmp_dist_x) +  sqrt(tmp_dist_y*tmp_dist_y)
+                    res =  m *  sqrt(tmp_dist_x*tmp_dist_x + tmp_dist_y*tmp_dist_y)
                     tmp_dist_x = pxls_view[i2][0] - view_colours[s_c*3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc = tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][1] - view_colours[s_c*3 + 1]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][2] - view_colours[s_c*3 + 2]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
+                    res += sqrt(acc_loc)
                     if res < min_c:
                         min_c = res
                         min_indx = s_c
                 if sx_c < loc_sz - 1:
                     tmp_dist_x = view_cntsx[s_c + 1] - x_c
                     tmp_dist_y = view_cntsy[s_c + 1] - y_c
-                    res =  sqrt(tmp_dist_x*tmp_dist_x) +  sqrt(tmp_dist_y*tmp_dist_y)
+                    res =  m *  sqrt(tmp_dist_x*tmp_dist_x + tmp_dist_y*tmp_dist_y)
                     tmp_dist_x = pxls_view[i2][0] - view_colours[s_c*3 + 3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc = tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][1] - view_colours[s_c*3 + 4]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][2] - view_colours[s_c*3 + 5]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
+                    res += sqrt(acc_loc)
                     if res < min_c:
                         min_c = res
                         min_indx = s_c + 1
                 if sy_c < loc_sz - 1:
                     tmp_dist_x = view_cntsx[s_c + loc_sz] - x_c
                     tmp_dist_y = view_cntsy[s_c + loc_sz] - y_c
-                    res =  sqrt(tmp_dist_x*tmp_dist_x) +  sqrt(tmp_dist_y*tmp_dist_y)
+                    res =  m *  sqrt(tmp_dist_x*tmp_dist_x + tmp_dist_y*tmp_dist_y)
                     tmp_dist_x = pxls_view[i2][0] - view_colours[s_c*3 + loc_sz*3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc = tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][1] - view_colours[s_c*3 + 1 + loc_sz*3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][2] - view_colours[s_c*3 + 2 + loc_sz*3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
+                    res += sqrt(acc_loc)
                     if res < min_c:
                         min_c = res
                         min_indx = s_c + loc_sz   
@@ -359,13 +353,14 @@ class Pixeliser(object):
                 if sx_c < loc_sz - 1 and sy_c < loc_sz - 1:
                     tmp_dist_x = view_cntsx[s_c + loc_sz + 1] - x_c
                     tmp_dist_y = view_cntsy[s_c + loc_sz + 1] - y_c
-                    res =  sqrt(tmp_dist_x*tmp_dist_x) +  sqrt(tmp_dist_y*tmp_dist_y)
+                    res =  m *  sqrt(tmp_dist_x*tmp_dist_x + tmp_dist_y*tmp_dist_y)
                     tmp_dist_x = pxls_view[i2][0] - view_colours[s_c*3 + loc_sz*3 + 3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc = tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][1] - view_colours[s_c*3 + 1 + loc_sz*3 + 4]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][2] - view_colours[s_c*3 + 2 + loc_sz*3 + 5]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
+                    res += sqrt(acc_loc)
                     if res < min_c:
                         min_c = res
                         min_indx = s_c + loc_sz + 1
@@ -373,13 +368,14 @@ class Pixeliser(object):
                 if sx_c < loc_sz - 1 and sy_c > 0:
                     tmp_dist_x = view_cntsx[s_c - loc_sz + 1] - x_c
                     tmp_dist_y = view_cntsy[s_c - loc_sz + 1] - y_c
-                    res =  sqrt(tmp_dist_x*tmp_dist_x) +  sqrt(tmp_dist_y*tmp_dist_y)
+                    res =  m *  sqrt(tmp_dist_x*tmp_dist_x + tmp_dist_y*tmp_dist_y)
                     tmp_dist_x = pxls_view[i2][0] - view_colours[s_c*3 - loc_sz*3 + 3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc = tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][1] - view_colours[s_c*3 + 1 - loc_sz*3 + 3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][2] - view_colours[s_c*3 + 2 - loc_sz*3 + 3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
+                    res += sqrt(acc_loc)
                     if res < min_c:
                         min_c = res
                         min_indx = s_c - loc_sz + 1
@@ -387,19 +383,20 @@ class Pixeliser(object):
                 if sx_c > 0 and sy_c < loc_sz - 1:
                     tmp_dist_x = view_cntsx[s_c + loc_sz - 1] - x_c
                     tmp_dist_y = view_cntsy[s_c + loc_sz - 1] - y_c
-                    res =  sqrt(tmp_dist_x*tmp_dist_x) +  sqrt(tmp_dist_y*tmp_dist_y)
+                    res =  m *  sqrt(tmp_dist_x*tmp_dist_x + tmp_dist_y*tmp_dist_y)
                     tmp_dist_x = pxls_view[i2][0] - view_colours[s_c*3 + loc_sz*3 - 3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc = tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][1] - view_colours[s_c*3 + 1 + loc_sz*3 - 3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
                     tmp_dist_x = pxls_view[i2][2] - view_colours[s_c*3 + 2 + loc_sz*3 - 3]
-                    res += m *  sqrt(tmp_dist_x*tmp_dist_x)
+                    acc_loc += tmp_dist_x*tmp_dist_x
+                    res += sqrt(acc_loc)
                     if res < min_c:
                         min_c = res
                         min_indx = s_c + loc_sz - 1
                 
                 res = 0
-                
+                acc_loc = 0
                 if min_indx != s_c:
                     cmask[i2] = min_indx
                     with gil:
@@ -413,7 +410,7 @@ class Pixeliser(object):
             #     print(check)
             
             # recenter
-            for i in range(N*((len_p%4)//3)):
+            for i in range(N*(len_p%2)):
                 tmp_loc = sprpxls[i]
                 tmp_loc.recenter(dt_arr, mask, i)
                 view_cntsx[i] = tmp_loc.get_centerx()
@@ -428,7 +425,7 @@ class Pixeliser(object):
                 view_colours[i*3 + 2] = b
             i2 = 0
             # laplacian smoothing
-            for i2 in prange((len_p%2)*loc_sz*loc_sz , nogil=True):   
+            for i2 in prange(loc_sz*loc_sz , nogil=True):   
                 
                 sum_x: cython.float = 0.0
                 sum_y: cython.float = 0.0
@@ -475,7 +472,7 @@ class Pixeliser(object):
             # Bilateral filter:
             i2 = 0
             # print(view_colours[56])
-            for i2 in prange(loc_sz*loc_sz, nogil=True):
+            for i2 in prange(0*loc_sz*loc_sz, nogil=True):
                 loc_idx: int64_t = 0
                 res_L_loc: cython.double = 0
                 res_a_loc: cython.double = 0
@@ -483,21 +480,21 @@ class Pixeliser(object):
                 sy_c: cython.int = <cython.int>floor(i2 / loc_sz)
                 sx_c: int64_t = i2 % loc_sz
                 glob_k_const: cython.double = 0
-                for loc_idx in prange(49):
-                        x_off: int64_t = loc_idx % 7
-                        y_off: int64_t = <cython.int>floor(loc_idx/7)
-                        if sx_c + (x_off - 3) >= loc_sz or sx_c + (x_off - 3) < 0:
+                for loc_idx in prange(9):
+                        x_off: int64_t = loc_idx % 3
+                        y_off: int64_t = <cython.int>floor(loc_idx/3)
+                        if sx_c + (x_off - 1) >= loc_sz or sx_c + (x_off - 1) < 0:
                             continue
-                        if sy_c + (y_off - 3) >= loc_sz or sy_c + (y_off - 3) < 0:
+                        if sy_c + (y_off - 1) >= loc_sz or sy_c + (y_off - 1) < 0:
                             continue
-                        if loc_idx == 17:
+                        if loc_idx == 4:
                             continue
-                        nxt_indx: int64_t = i2 + x_off - 3 + (y_off - 3)*loc_sz
+                        nxt_indx: int64_t = i2 + x_off - 1 + (y_off - 1)*loc_sz
                         g: cython.float = exp( -((view_colours[i2*3] - view_colours[nxt_indx*3] )*(view_colours[i2*3] - view_colours[nxt_indx*3] ) 
                         +  (view_colours[i2*3 + 1] - view_colours[nxt_indx*3 + 1] )*(view_colours[i2*3 + 1] - view_colours[nxt_indx*3 + 1] ) + 
-                        (view_colours[i2*3 + 2] - view_colours[nxt_indx*3 + 2] )*(view_colours[i2*3 + 2] - view_colours[nxt_indx*3 + 2] )) / (2 * 1 * 1) )
-                        g2: cython.float = exp( -((y_off -  3)*(y_off -  3 ) 
-                        +  ( x_off -  3)*( x_off -  3) 
+                        (view_colours[i2*3 + 2] - view_colours[nxt_indx*3 + 2] )*(view_colours[i2*3 + 2] - view_colours[nxt_indx*3 + 2] )) / (2 * 0.5 * 0.5) )
+                        g2: cython.float = exp( -((y_off -  1)*(y_off -  1 ) 
+                        +  ( x_off -  1)*( x_off -  1) 
                         ) / (2 * 1 * 1) )
                         res_L_loc+=g2*g*view_colours[nxt_indx*3]
                         res_a_loc+=g2*g*view_colours[nxt_indx*3+1]
@@ -536,11 +533,12 @@ class Pixeliser(object):
                     
                     res: cython.float = 0
                     tmp_dist_x: cython.float  = palette_view[c_count][0] - view_colours[i2*3]
-                    res +=sqrt(tmp_dist_x*tmp_dist_x)
+                    res +=tmp_dist_x*tmp_dist_x
                     tmp_dist_x = palette_view[c_count][1] - view_colours[i2*3 + 1]
-                    res +=sqrt(tmp_dist_x*tmp_dist_x)
+                    res +=tmp_dist_x*tmp_dist_x
                     tmp_dist_x = palette_view[c_count][2] - view_colours[i2*3 + 2]
-                    res +=sqrt(tmp_dist_x*tmp_dist_x)
+                    res +=tmp_dist_x*tmp_dist_x
+                    res = sqrt(res)
                     pcp[c_count][i2] = pc[c_count] * exp(- res / t)
                     
                     res = 0
@@ -569,6 +567,7 @@ class Pixeliser(object):
                 res_L: cython.float = 0
                 res_a: cython.float = 0
                 res_b: cython.float = 0
+                loc_tmp: cython.float = 0
                 for c_count in prange(loc_sz*loc_sz):
                     res_L += view_colours[c_count*3]*pcp[i2][c_count]
                     res_a += view_colours[c_count*3+1]*pcp[i2][c_count]
@@ -576,13 +575,15 @@ class Pixeliser(object):
                 old: cython.float = palette_view[i2][0]
 
                 palette_view[i2][0] = res_L/(loc_sz*loc_sz*pc[i2])
-                change += sqrt((old-palette_view[i2][0]) * (old-palette_view[i2][0]))
+                loc_tmp += (old-palette_view[i2][0]) * (old-palette_view[i2][0])
                 old = palette_view[i2][1]
                 palette_view[i2][1] = res_a/(loc_sz*loc_sz*pc[i2])
-                change += sqrt((old-palette_view[i2][1]) * (old-palette_view[i2][1]))
+                loc_tmp += (old-palette_view[i2][1]) * (old-palette_view[i2][1])
                 old = palette_view[i2][2]
                 palette_view[i2][2] = res_b/(loc_sz*loc_sz*pc[i2])
-                change += sqrt((old-palette_view[i2][2]) * (old-palette_view[i2][2]))
+                loc_tmp += (old-palette_view[i2][2]) * (old-palette_view[i2][2])
+                change+=sqrt(loc_tmp)
+                loc_tmp = 0
             
             # calculate true palette
             q_tree.append(root_tree)
@@ -618,7 +619,7 @@ class Pixeliser(object):
             #     return
 
             Pixeliser.palette_history.append(lab2rgb(np.array(disp_palette))*255)
-            
+            print(change)
             # expand:
             if change_min > change:
                 t = t * 0.7
@@ -630,9 +631,10 @@ class Pixeliser(object):
                         cur = q_tree.pop(0)
                         if cur.lchld.lchld == None:
                             loc_dif = 0
-                            loc_dif += math.sqrt((palette_view[cur.lchld.indx][0] - palette_view[cur.rchld.indx][0])**2)
-                            loc_dif += math.sqrt((palette_view[cur.lchld.indx][1] - palette_view[cur.rchld.indx][1])**2)
-                            loc_dif += math.sqrt((palette_view[cur.lchld.indx][2] - palette_view[cur.rchld.indx][2])**2)
+                            loc_dif += (palette_view[cur.lchld.indx][0] - palette_view[cur.rchld.indx][0])**2
+                            loc_dif += (palette_view[cur.lchld.indx][1] - palette_view[cur.rchld.indx][1])**2
+                            loc_dif += (palette_view[cur.lchld.indx][2] - palette_view[cur.rchld.indx][2])**2
+                            loc_dif = math.sqrt(loc_dif)
                             if True:
                                 # l_maximal = cur.lchld
                                 # r_maximal = cur.rchld
@@ -717,9 +719,9 @@ class Pixeliser(object):
             i2 = 0
             associations_v: cython.int[:] = associations
             for i in range(loc_sz*loc_sz*((len_p-1)%2)):
-                view_colours[i*3] = palette[associations_v[i]][0]
-                view_colours[i*3 + 1] = palette[associations_v[i]][1]
-                view_colours[i*3 + 2] = palette[associations_v[i]][2]
+                view_colours[i*3] = true_palette[associations_v[i]][0]
+                view_colours[i*3 + 1] = true_palette[associations_v[i]][1]
+                view_colours[i*3 + 2] = true_palette[associations_v[i]][2]
                 
             # print(len_p)
             if (len_p%2==1):

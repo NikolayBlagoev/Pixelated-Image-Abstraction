@@ -153,7 +153,7 @@ lbl_d_var = StringVar()
 lbl_d = Label( control_pnl, textvariable=lbl_d_var )
 lbl_d_var.set("Minimum change:")
 lbl_d.grid(row=11, column=0)
-scl_d = Scale(control_pnl, from_=2, to=8,orient=HORIZONTAL, command = on_d_slide, resolution=0.0005, length = 200)
+scl_d = Scale(control_pnl, from_=0.1, to=2,orient=HORIZONTAL, command = on_minimal_change_slider, resolution=0.005, length = 200)
 scl_d.grid(row = 12, column = 0, sticky=N)
 scl_d.set(2.5)
 
