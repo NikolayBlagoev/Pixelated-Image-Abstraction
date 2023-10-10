@@ -1,0 +1,6 @@
+books/
+build/
+extra_imgs/
+nn/
+**.pyd
+**.c
