@@ -15,6 +15,10 @@ from libc.stdio cimport printf
 import array
 import time
 from typing import List
+from sklearn.cluster import KMeans
+from sklearn.datasets import load_sample_image
+from sklearn.metrics import pairwise_distances_argmin
+from sklearn.utils import shuffle
 from scipy.stats import multivariate_normal
 cnp.import_array()
 
@@ -108,8 +112,10 @@ class Pixeliser(object):
     glob_img = None
     quantised = None
     method = "None"
+    kerneld_def = 5
     doing = False
     running = True
+    sigma = 0.5
     avg_pixels = False
     msg_queue = Queue()
     norm = multivariate_normal(mean = [0,0,0], cov=[[1,0,0],[0,1,0],[0,0,1]])
@@ -224,7 +230,11 @@ class Pixeliser(object):
         palette = np.array([tmp_mn-EPS_change*pca.components_[principle_choice],tmp_mn+EPS_change*pca.components_[principle_choice]])
         cdef int loc_sz = Pixeliser.sz[0]
         cdef int n2 = 400*400
-        cdef float m = 40 * math.sqrt(Pixeliser.sz[0]*Pixeliser.sz[1] / (400*400))
+        cdef int krnlsz = Pixeliser.kerneld_def
+        cdef int krnl_off = <int>(krnlsz/2)
+        krnl_off += 1
+        cdef float sm = Pixeliser.sigma*Pixeliser.sigma
+        cdef float m = 45 * math.sqrt(Pixeliser.sz[0]*Pixeliser.sz[1] / (400*400))
         cdef double[:,:] pxls_view = dt_arr    
         new_colours: cython.float[:] = np.zeros(loc_sz*loc_sz*3 ,dtype= np.single)
         tmp_color = None
@@ -472,51 +482,49 @@ class Pixeliser(object):
             # Bilateral filter:
             i2 = 0
             # print(view_colours[56])
-            for i2 in prange(0*loc_sz*loc_sz, nogil=True):
+            for i2 in prange(loc_sz*loc_sz, nogil=True):
+                new_colours[i2*3] = 0
+                new_colours[i2*3 + 1] = 0
+                new_colours[i2*3 + 2] = 0
                 loc_idx: int64_t = 0
-                res_L_loc: cython.double = 0
-                res_a_loc: cython.double = 0
-                res_b_loc: cython.double = 0
+                
                 sy_c: cython.int = <cython.int>floor(i2 / loc_sz)
                 sx_c: int64_t = i2 % loc_sz
                 glob_k_const: cython.double = 0
-                for loc_idx in prange(9):
-                        x_off: int64_t = loc_idx % 3
-                        y_off: int64_t = <cython.int>floor(loc_idx/3)
-                        if sx_c + (x_off - 1) >= loc_sz or sx_c + (x_off - 1) < 0:
+                for loc_idx in prange(krnlsz*krnlsz):
+                        x_off: int64_t = loc_idx % krnlsz
+                        y_off: int64_t = <cython.int>floor(loc_idx/krnlsz)
+                        if sx_c + (x_off - krnl_off) >= loc_sz or sx_c + (x_off - krnl_off) < 0:
                             continue
-                        if sy_c + (y_off - 1) >= loc_sz or sy_c + (y_off - 1) < 0:
+                        if sy_c + (y_off - krnl_off) >= loc_sz or sy_c + (y_off - krnl_off) < 0:
                             continue
-                        if loc_idx == 4:
-                            continue
-                        nxt_indx: int64_t = i2 + x_off - 1 + (y_off - 1)*loc_sz
+                        
+                        nxt_indx: int64_t = i2 + x_off - krnl_off + (y_off - krnl_off)*loc_sz
                         g: cython.float = exp( -((view_colours[i2*3] - view_colours[nxt_indx*3] )*(view_colours[i2*3] - view_colours[nxt_indx*3] ) 
                         +  (view_colours[i2*3 + 1] - view_colours[nxt_indx*3 + 1] )*(view_colours[i2*3 + 1] - view_colours[nxt_indx*3 + 1] ) + 
-                        (view_colours[i2*3 + 2] - view_colours[nxt_indx*3 + 2] )*(view_colours[i2*3 + 2] - view_colours[nxt_indx*3 + 2] )) / (2 * 0.5 * 0.5) )
-                        g2: cython.float = exp( -((y_off -  1)*(y_off -  1 ) 
-                        +  ( x_off -  1)*( x_off -  1) 
-                        ) / (2 * 1 * 1) )
-                        res_L_loc+=g2*g*view_colours[nxt_indx*3]
-                        res_a_loc+=g2*g*view_colours[nxt_indx*3+1]
-                        res_b_loc+=g2*g*view_colours[nxt_indx*3+2]
+                        (view_colours[i2*3 + 2] - view_colours[nxt_indx*3 + 2] )*(view_colours[i2*3 + 2] - view_colours[nxt_indx*3 + 2] )) / (2 * sm) )
+                        g2: cython.float = exp( -((y_off -  krnl_off)*(y_off -  krnl_off ) 
+                        +  ( x_off -  krnl_off)*( x_off -  krnl_off) 
+                        ) / (2 * sm) )
+                        new_colours[i2*3]+=g2*g*view_colours[nxt_indx*3]
+                        new_colours[i2*3 + 1]+=g2*g*view_colours[nxt_indx*3+1]
+                        new_colours[i2*3 + 2]+=g2*g*view_colours[nxt_indx*3+2]
                         glob_k_const+=g2*g
                         # printf("%f - g %f - g2 %d %d\n", g, g2, i2, nxt_indx, sy_c, sx_c, x_off, y_off)
-                        # g = 0
-                        # g2 = 0
+                        g = 0
+                        g2 = 0
                     
                        
-                new_colours[i2*3] = (view_colours[i2*3]+res_L_loc)/(glob_k_const+ 1)
-                new_colours[i2*3 + 1] = (view_colours[i2*3+1]+res_a_loc)/(glob_k_const+ 1)
-                new_colours[i2*3 + 2] = (view_colours[i2*3+2]+res_b_loc)/(glob_k_const+ 1)
+                new_colours[i2*3] = new_colours[i2*3]/(glob_k_const+ 0.000001)
+                new_colours[i2*3 + 1] = new_colours[i2*3 + 1]/(glob_k_const+ 0.000001)
+                new_colours[i2*3 + 2] = new_colours[i2*3 + 2]/(glob_k_const+ 0.000001)
                 # printf("%f %f  %f %f %f\n",view_colours[i2*3], new_colours[i2*3], view_colours[i2*3+1], new_colours[i2*3 +1], glob_k_const)
                 glob_k_const = 0
-                res_a_loc = 0
-                res_L_loc = 0
-                res_b_loc = 0
+                
             # print("bilateral",palette,palette.shape,new_colours[56],view_colours[56])
             tmp_color = view_colours
             view_colours = new_colours
-            new_colours = tmp_color
+            new_colours = tmp_color    
             # print("bilateral2 log:" ,new_colours[56],view_colours[56])
             
             # Step 2: Palette association:
@@ -622,7 +630,7 @@ class Pixeliser(object):
             print(change)
             # expand:
             if change_min > change:
-                t = t * 0.7
+                t = t * 0.8
                 if palette.shape[0]<2*Pixeliser.quantisation:
                     q_tree.append(root_tree)
                     
@@ -722,7 +730,7 @@ class Pixeliser(object):
                 view_colours[i*3] = true_palette[associations_v[i]][0]
                 view_colours[i*3 + 1] = true_palette[associations_v[i]][1]
                 view_colours[i*3 + 2] = true_palette[associations_v[i]][2]
-                
+            
             # print(len_p)
             if (len_p%2==1):
                 spr_borders = np.zeros((400*400,4))
@@ -773,10 +781,34 @@ class Pixeliser(object):
             Pixeliser.quantised = Pixeliser.glob_img
         elif Pixeliser.method == "Median cut":
             Pixeliser.quantised = Pixeliser.glob_img.quantize(Pixeliser.quantisation, method = Image.Quantize.MEDIANCUT, dither = Image.Dither.NONE)
+            tmp_img = np.array(Pixeliser.quantised.convert('RGB'))
+            
+            Pixeliser.palette_history = [np.unique(tmp_img.reshape(-1,3), axis=0)]
+            
         elif Pixeliser.method == "Max coverage":
             Pixeliser.quantised = Pixeliser.glob_img.quantize(Pixeliser.quantisation, method = Image.Quantize.MAXCOVERAGE, dither = Image.Dither.NONE)
+            tmp_img = np.array(Pixeliser.quantised.convert('RGB'))
+            
+            Pixeliser.palette_history = [np.unique(tmp_img.reshape(-1,3), axis=0)]
         elif Pixeliser.method == "Fast Octree":
             Pixeliser.quantised = Pixeliser.glob_img.quantize(Pixeliser.quantisation, method = Image.Quantize.FASTOCTREE, dither = Image.Dither.NONE)
+            tmp_img = np.array(Pixeliser.quantised.convert('RGB'))
+            
+            Pixeliser.palette_history = [np.unique(tmp_img.reshape(-1,3), axis=0)]
+        elif Pixeliser.method == "K-means":
+            image_array = np.reshape(Pixeliser.glob_img, (400*400, 3))
+            image_array_sample = shuffle(image_array, random_state=0, n_samples=2_000)
+            kmeans = KMeans(n_clusters=Pixeliser.quantisation, n_init="auto", random_state=0).fit(
+                image_array_sample
+            )
+            labels = kmeans.predict(image_array)
+            def recreate_image(codebook, labels, w, h):
+                """Recreate the (compressed) image from the code book & labels"""
+                return codebook[labels].reshape(w, h, -1)
+            # print(recreate_image(kmeans.cluster_centers_, labels, 400, 400).shape)
+            Pixeliser.quantised = Image.fromarray(recreate_image(kmeans.cluster_centers_, labels, 400, 400).astype(np.uint8))
+            # print(kmeans.cluster_centers_)
+            Pixeliser.palette_history = [kmeans.cluster_centers_]
     def main(q: Queue):
         
         

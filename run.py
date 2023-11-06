@@ -20,7 +20,8 @@ options_quantisation = [
     "None",
     "Median cut",
     "Max coverage",
-    "Fast Octree"
+    "Fast Octree",
+    "K-means"
 ]
 cur_option_pixelisation = "Nearest"
 cur_option_quantisation = "None"
@@ -109,6 +110,11 @@ def on_minimal_change_slider(inp):
 def on_sigma_slider(inp):
     inp = float(inp)
     Pixeliser.sigma = inp
+
+
+def on_chng_slider(inp):
+    inp = int(inp)
+    Pixeliser.kerneld_def = inp
 clicked_pixelisation = StringVar()
   
 clicked_pixelisation.set( cur_option_pixelisation )
@@ -137,9 +143,9 @@ lbl_eps_var = StringVar()
 lbl_eps = Label( control_pnl, textvariable=lbl_eps_var )
 lbl_eps_var.set("Epsilon change:")
 lbl_eps.grid(row=7, column=0)
-scl_eps = Scale(control_pnl, from_=0.0001, to=0.1,orient=HORIZONTAL, command = on_eps_slide, resolution=0.000005, length = 200)
+scl_eps = Scale(control_pnl, from_=0.01, to=2,orient=HORIZONTAL, command = on_eps_slide, resolution=0.05, length = 200)
 scl_eps.grid(row = 8, column = 0, sticky=N)
-scl_eps.set(0.0025)
+scl_eps.set(0.01)
 
 lbl_d_var = StringVar()
 lbl_d = Label( control_pnl, textvariable=lbl_d_var )
@@ -153,7 +159,7 @@ lbl_d_var = StringVar()
 lbl_d = Label( control_pnl, textvariable=lbl_d_var )
 lbl_d_var.set("Minimum change:")
 lbl_d.grid(row=11, column=0)
-scl_d = Scale(control_pnl, from_=0.1, to=2,orient=HORIZONTAL, command = on_minimal_change_slider, resolution=0.005, length = 200)
+scl_d = Scale(control_pnl, from_=0.1, to=5,orient=HORIZONTAL, command = on_minimal_change_slider, resolution=0.1, length = 200)
 scl_d.grid(row = 12, column = 0, sticky=N)
 scl_d.set(2.5)
 
@@ -161,19 +167,29 @@ lbl_d_var = StringVar()
 lbl_d = Label( control_pnl, textvariable=lbl_d_var )
 lbl_d_var.set("Bilateral sigma:")
 lbl_d.grid(row=13, column=0)
-scl_d = Scale(control_pnl, from_=0.01, to=2,orient=HORIZONTAL, command = on_sigma_slider, resolution=0.01, length = 200)
+scl_d = Scale(control_pnl, from_=0.01, to=4,orient=HORIZONTAL, command = on_sigma_slider, resolution=0.1, length = 200)
 scl_d.grid(row = 14, column = 0, sticky=N)
 scl_d.set(0.5)
 
 
 
+lbl_d_var = StringVar()
+lbl_d = Label( control_pnl, textvariable=lbl_d_var )
+lbl_d_var.set("Bilateral size:")
+lbl_d.grid(row=15, column=0)
+scl_d = Scale(control_pnl, from_=3, to=10,orient=HORIZONTAL, command = on_chng_slider, resolution=1, length = 200)
+scl_d.grid(row = 16, column = 0, sticky=N)
+scl_d.set(5)
+
+
+
 lbl_p_var = StringVar()
 lbl_p = Label( control_pnl, textvariable=lbl_p_var )
-lbl_p_var.set("Iter:")
-lbl_p.grid(row=19, column=0)
-scl_p = Scale(control_pnl, from_=1, to=2000,orient=HORIZONTAL, command = draw_palette, resolution=2, length = 400)
-scl_p.grid(row = 20, column = 0, sticky=N)
-scl_p.set(1000)
+lbl_p_var.set("Iteration:")
+lbl_p.grid(row=21, column=0)
+scl_p = Scale(control_pnl, from_=1, to=1000,orient=HORIZONTAL, command = draw_palette, resolution=2, length = 400)
+scl_p.grid(row = 22, column = 0, sticky=N)
+scl_p.set(200)
 
 img1 = ImageTk.PhotoImage(img)
 canv.create_image(20,20, anchor=NW, image=img1)
